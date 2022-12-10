@@ -1,0 +1,8 @@
+testvar = 'n' // test
+/*
+testvar = ''
+*/
+newvar = 0
+function testvar():
+
+end

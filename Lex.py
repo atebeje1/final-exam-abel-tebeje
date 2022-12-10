@@ -1,165 +1,76 @@
-class Error(Exception):
+import re
+from Token import token
+
+class LexicalError(Exception):
   pass
-class RDA:
-  tokens = []
-  current = 0
-  currentToken = None
-  def __init__(self, tokens:list) -> None:
-    self.tokens = tokens
-    self.current = 0
-    self.currentToken = tokens[self.current]
-    self.generate()
-
-  def __str__(self):
-    return ' '.join([str(item) for item in self.tokens])
-
-  def getNextToken(self):
-    if self.current < len(self.tokens):
-      self.current += 1
-
-    self.currentToken = self.tokens[self.current]
-
-  def bool_expr(self):
-    pass
-  def band(self):
-    pass
-  def beq(self):
-    pass
-  def brel(self):
-    pass
-  def bexpr(self):
-    pass
-  def bterm(self):
-    # <term> --> <factor> { (`*` | `/` | '%') <factor> }
-    self.factor()
-    while self.current() in ('*', '/', '%'):
-      self.getNextToken()
-      self.bfactor()
-  def bnot(self):
-    pass
-  def bfactor(self):
-    '''
-    <bfactor> --> `id` | `int_lit` | `float_lit` | `bool_lit` | `(` <bexpr> `)`
-    FIRST(<bfactor>) -> {id}{int_lit}{float_lit}{'('}
-    '''
-    if self.currentToken in ('id', 'int_lit', 'float_lit'):
-      self.getNextToken()
-    elif self.currentToken == '(':
-      self.getNextToken()
-      self.bexpr()
-      if self.getCurrentToken == ')':
-        self.getNextToken()
-      else:
-        self.error()
-    else:
-      self.error()
-
-
   
-  def stmt(self):
-    # <stmt> --><if_stmt> | <while_loop> | <assignment> | <block>
-    if self.currentToken == 'if':
-      self.if_stmt()
-    elif self.currentToken == 'while':
-      self.while_stmt()
-    elif self.currentToken == 'id':
-      self.assignment()
-    elif self.currentToken == '{':
-      self.block()
-    else:
-      self.error()
-    pass
-  def block(self):
-    # block --> `{` {<stmt>';` } `}`
-    if self.currentToken == '{':
-      self.getNextToken()
-      while self.currentToken in ('if', 'while', 'id', '{'):
-        self.stmt()
-        if self.currentToken == ';':
-          self.getNextToken()
-        else:
-          self.error()
-      if self.currentToken == '}':
-        self.getNextToken()
-      else:
-        self.error()
-    else:
-      self.error()
-    pass
-  def if_stmt(self):
-    # <if_stmt> --> `if``(`<bool_expr>`)` <stmt>
-    if self.currentToken == 'if':
-      self.getNextToken()
-      if self.currentToken == '(':
-        self.getNextToken()
-        self.expr()
-        if self.currentToken == ')':
-          self.getNextToken()
-          self.stmt()
-        else:
-          self.error()
-      pass
-    else:
-      self.error()
+class lexer:
+  def __init__(self, text:str):
+    self.text = text
+    self.tokens = self.toTokens()
+  def error(self, details = None):
+    raise LexicalError(details)
   
-  def while_stmt(self):
-    # <while_loop> --> `while``(`<bool_expr>`)` <stmt>
-    if self.currentToken == 'while':
-      self.getNextToken()
-      if self.currentToken == '(':
-        self.getNextToken()
-        self.expr()
-        if self.currentToken == ')':
-          self.getNextToken()
-          self.stmt()
+  def toTokens(self):
+    result = []
+    isMultiLineComment = False
+    for line in self.text.split('\n'):
+      original = line
+      id = '[A-Za-z]{1}[A-Za-z0-9_]{5,7}'
+      if line == '':
+        continue
+      if isMultiLineComment:
+        if re.search('\*/', line):
+          line = re.sub('^.*\*/','<E_MLC>', line)
+          isMultiLineComment = False
         else:
-          self.error()
-      pass
-    else:
-      self.error()
-    
-  def assignment(self):
-    # <assignment> --> `id` `=` <expr>
-    if self.currentToken == 'id':
-      self.getNextToken()
-      if self.currentToken == '=':
-        self.getNextToken()
-        self.expr()
-      else:
-        self.error()
-    else:
-      self.error()
-      
-  def expr(self):
-    # <term> --> <factor> { (+|-) <factor> }
-    self.term()
-    while self.current() in ('+', '-'):
-      self.getNextToken()
-      self.term()
-  
-  def term(self):
-    # <term> --> <factor> { (`*` | `/` | '%') <factor> }
-    self.factor()
-    while self.current() in ('*', '/', '%'):
-      self.getNextToken()
-      self.factor()
-    
-  def factor(self):
-    '''
-    <factor> --> `id` | `int_lit` | `float_lit` `(` <expr> `)`
-    FIRST(<factor>) -> {id}{int_lit}{float_lit}{'('}
-    '''
-    print('current:',self.currentToken)
-    if self.currentToken in ('id', 'int_lit', 'float_lit'):
-      self.getNextToken()
-    elif self.currentToken == '(':
-      self.getNextToken()
-      self.expr()
-      if self.getCurrentToken == ')':
-        self.getNextToken()
-      else:
-        self.error()
-    else:
-      self.error()
-  def error(self):
-    raise Error('Lexical error detected')
+          line = '<MLC>'
+          continue
+      elif re.search('//', line):
+        line = re.sub('//.*$', '<SLC>', line)
+      elif re.search('/*', line):
+        isMultiLineComment = True
+        line = re.sub('/\*', '<S_MLC>', line)
+      if re.search(id, line):
+        line = re.sub(id,'<V_ID>', line)
+        if re.search('=', line) and not re.search('==', line):
+          line = re.sub('=', '<A_OP>', line)
+        if re.search('\".*\"', line):
+          line = re.sub('\".*\"', '<STR>', line)
+      char_pattern = '\'\\?.\''
+      print(re.search('\'[A-Za-z0-9_]\'', line))
+      print(re.search('\'(\\?\D)?\'', line))
+      if re.search('\'.\'', line):
+        line = re.sub('\'.\'', '<CHAR>', line)
+      if re.search('[0-9]+\.[0-9]*[Nn]?', line):
+        line = re.sub('[0-9]+\.[0-9]*', '<REAL>', line)
+      if re.search('[0-9]+[Nn]?', line):
+        line = re.sub('[0-9]+[Nn]?', '<NATNUM>', line)
+      if re.search('true|false', line):
+        line = re.sub('true|false', '<BOOL>', line)
+      if re.search('function', line):
+        print(True)
+        line = re.sub('function', '<FUNCT>', line)
+        if re.search(id, line):
+          print('RESULT:', re.search(id, line))
+        for var in re.findall(id, line):
+          if var != 'FUNCTION':
+            line = re.sub(var, '<FNAME>', line) 
+            line = re.sub('\(', '<BARGS>', line)
+            while re.match('id', line):
+              line = re.sub(id, '<A_ID>', line)
+              if ',' in line:
+                line = re.sub(',', '<SPRTR>', line)
+            line = re.sub('\)','<EARGS>', line)
+            line = re.sub(':', '<B_BLK>', line)
+      elif line.startswith('end'):
+        line = re.sub('end', '<E_BLK>', line)
+      line = re.sub('><', '> <', line)
+      print('\tOriginal line: {}'.format(original))
+      print('\t\tAdjusted line: {}'.format(line))
+      for lexeme in line.split(' '):
+        if lexeme == '<MLC>':
+          continue
+        result.append(token(lexeme))
+      result.append(token('<EOL>'))
+      print('\t\t\t{}'.format(result))
